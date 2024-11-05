@@ -1,7 +1,7 @@
 ---
-title: "title"
-author: "author"
-date: "date"
+title: "PS5: Web Scraping"
+author: "Maryell Abella & Sarah Kim"
+date: "11/9/2024"
 format: 
   pdf:
     include-in-header: 
@@ -26,12 +26,12 @@ output:
 ## Submission Steps (10 pts)
 1. This problem set is a paired problem set.
 2. Play paper, scissors, rock to determine who goes first. Call that person *Partner 1*.
-    - Partner 1 (name and cnet ID):
-    - Partner 2 (name and cnet ID):
+    - Partner 1 (name and cnet ID): Maryell Abella, maryell
+    - Partner 2 (name and cnet ID): Sarah Kim, sarahk1
 3. Partner 1 will accept the `ps5` and then share the link it creates with their partner. You can only share it with one partner so you will not be able to change it after your partner has accepted. 
-4. "This submission is our work alone and complies with the 30538 integrity policy." Add your initials to indicate your agreement: \*\*\_\_\*\* \*\*\_\_\*\*
+4. "This submission is our work alone and complies with the 30538 integrity policy." Add your initials to indicate your agreement: \*\*MA\*\* \*\*SK\*\*
 5. "I have uploaded the names of anyone else other than my partner and I worked with on the problem set **[here](https://docs.google.com/forms/d/185usrCREQaUbvAXpWhChkjghdGgmAZXA3lPWpXLLsts/edit)**"  (1 point)
-6. Late coins used this pset: \*\*\_\_\*\* Late coins left after submission: \*\*\_\_\*\*
+6. Late coins used this pset: \*\*0\*\* Late coins left after submission: \*\*4\*\*
 7. Knit your `ps5.qmd` to an PDF file to make `ps5.pdf`, 
     * The PDF should not be more than 25 pages. Use `head()` and re-size figures when appropriate. 
 8. (Partner 1): push  `ps5.qmd` and `ps5.pdf` to your github repo.
@@ -44,8 +44,10 @@ output:
 import pandas as pd
 import altair as alt
 import time
-
+import requests
+from bs4 import BeautifulSoup
 import warnings 
+import re
 warnings.filterwarnings('ignore')
 alt.renderers.enable("png")
 ```
@@ -55,31 +57,132 @@ alt.renderers.enable("png")
 
 ### 1. Scraping (PARTNER 1)
 
-```{python}
+1. (Partner 1) Scraping: Go to the first page of the HHS OIG’s “Enforcement Actions”
+page and scrape and collect the following into a dataset:
+• Title of the enforcement action
+• Date
+• Category (e.g, “Criminal and Civil Actions”)
+• Link associated with the enforcement action
 
+```{python}
+url = "https://oig.hhs.gov/fraud/enforcement/"
+response = requests.get(url)
+soup = BeautifulSoup(response.text, 'lxml')
 ```
 
-  
+```{python}
+main_tag = soup.find('main')
+li_with_div = soup.find_all(lambda t: t.name == 'li' and t.find('div'))
+li_with_div_content = [li.contents for li in li_with_div]
+
+for li in li_with_div_content[:19]:  
+    li_soup = BeautifulSoup(''.join(str(item) for item in li), 'html.parser')
+    
+    title_tag = li_soup.select_one('h2 a')
+    title = title_tag.get_text(strip=True) 
+    link = title_tag['href'] 
+    
+    date_tag = li_soup.select_one('span')
+    date = date_tag.get_text(strip=True) 
+    
+    category_tag = li_soup.select_one('ul li')
+    category = category_tag.get_text(strip=True)
+    
+    enforcement_actions.append({
+        'Title': title,
+        'Link': f"https://oig.hhs.gov{link}",
+        'Date': date,
+        'Category': category
+    })
+
+enforcement_df = pd.DataFrame(enforcement_actions)
+print(enforcement_df.head())
+```
+
 ### 2. Crawling (PARTNER 1)
+2. (Partner 1) Crawling: Then for each enforcement action, click the link and collect
+the name of the agency involved (e.g., for this link, it would be U.S. Attorney’s Office,
+Eastern District of Washington).
+Update your dataframe with the name of the agency and print its head.
+
 
 ```{python}
+url_1 = "https://oig.hhs.gov/fraud/enforcement/north-texas-medical-center-pays-142-million-to-resolve-potential-false-claims-act-liability-for-self-reported-violations-of-medicare-regs-stark-law/"
 
+response_1 = requests.get(url_1)
+soup_1= BeautifulSoup(response_1.content, 'html.parser')
+
+li_tags = soup_1.find_all('li')
+for li in li_tags:
+    agency_span = li.find('span')
+    
+    if agency_span and "Agency" in agency_span.text:  
+        agency_name = agency_span.find_next_sibling(text=True)
+        
+        if agency_name:
+            print(agency_name.strip())
 ```
+
+
+```{python}
+agency_names = []
+
+for link in enforcement_df['Link']:
+    response_1 = requests.get(link)
+    soup_1 = BeautifulSoup(response_1.content, 'html.parser')
+    
+    li_tags = soup_1.find_all('li')
+    agency_name = None
+    
+    for li in li_tags:
+        agency_span = li.find('span')
+        
+        if agency_span and "Agency" in agency_span.text: 
+            agency_name = agency_span.find_next_sibling(text=True)
+            if agency_name:
+                agency_name = agency_name.strip()  
+
+    agency_names.append(agency_name)
+
+enforcement_df['Agency'] = agency_names
+print(enforcement_df.head())
+```
+
 
 ## Step 2: Making the scraper dynamic
+Turning the scraper into a function: You will write a function that takes as input
+a month and a year, and then pulls and formats the enforcement actions like in Step 1
+starting from that month+year to today.
+
+• This function should first check that the year inputted >= 2013 before starting to
+scrape. If the year inputted < 2013, it should print a statement reminding the user
+to restrict to year >= 2013, since only enforcement actions after 2013 are listed.
+• It should save the dataframe output into a .csv file named as “enforcement_actions_
+year_month.csv” (do not commit this file to git)
+• If you’re crawling multiple pages, always add 1 second wait before going to the next
+page to prevent potential server-side block. To implement this in Python, you may
+look up .sleep() function from time library.
 
 ### 1. Turning the scraper into a function 
 
-* a. Pseudo-Code (PARTNER 2)
+* a. Pseudo-Code (PARTNER 2) (Partner 2) Before writing out your function, write down pseudo-code of the steps that
+your function will go through. If you use a loop, discuss what kind of loop you will use
+and how you will define it.
 
 
-* b. Create Dynamic Scraper (PARTNER 2)
+* b. Create Dynamic Scraper (PARTNER 2) Now code up your dynamic scraper and run it to start collecting the enforcement
+actions since January 2023. How many enforcement actions do you get in your final
+dataframe? What is the date and details of the earliest enforcement action it scraped?
 
 ```{python}
 
 ```
 
-* c. Test Partner's Code (PARTNER 1)
+* c. Test Partner's Code (PARTNER 1) Now, let’s go a little further back. Test your partner’s code by collecting
+the actions since January 2021. Note that this can take a while. How many enforcement
+actions do you get in your final dataframe? What is the date and details of the earliest
+enforcement action it scraped? Use the dataframe from this process for every question
+after this.
 
 ```{python}
 
@@ -88,36 +191,51 @@ alt.renderers.enable("png")
 ## Step 3: Plot data based on scraped data
 
 ### 1. Plot the number of enforcement actions over time (PARTNER 2)
+1. (Partner 2) Plot a line chart that shows: the number of enforcement actions over
+time (aggregated to each month+year) overall since January 2021,
 
 ```{python}
 
 ```
 
 ### 2. Plot the number of enforcement actions categorized: (PARTNER 1)
-
-* based on "Criminal and Civil Actions" vs. "State Enforcement Agencies"
+2. (Partner 1) Plot a line chart that shows: the number of enforcement actions split
+out by:
+• “Criminal and Civil Actions” vs. “State Enforcement Agencies”
 
 ```{python}
 
 ```
 
-* based on five topics
+• Five topics in the “Criminal and Civil Actions” category: “Health Care Fraud”,
+“Financial Fraud”, “Drug Enforcement”, “Bribery/Corruption”, and “Other”. Hint:
+You will need to divide the five topics manually by looking at the title and assigning
+the relevant topic. For example, if you find the word “bank” or “financial” in the
+title of an action, then that action should probably belong to “Financial Fraud”
+topic.
 
 ```{python}
 
 ```
 
 ## Step 4: Create maps of enforcement activity
+For these questions, use this US Attorney District shapefile (link) and a Census state shapefile
+(link)
 
 ### 1. Map by State (PARTNER 1)
-
+(Partner 1) Map by state: Among actions taken by state-level agencies, clean the state
+names you collected and plot a choropleth of the number of enforcement actions for each
+state. Hint: look for “State of” in the agency info!
 ```{python}
 
 ```
 
 
 ### 2. Map by District (PARTNER 2)
-
+(Partner 2) Map by district: Among actions taken by US Attorney District-level agencies,
+clean the district names so that you can merge them with the shapefile, and then
+plot a choropleth of the number of enforcement actions in each US Attorney District.
+Hint: look for “District” in the agency info.
 ```{python}
 
 ```
@@ -125,16 +243,27 @@ alt.renderers.enable("png")
 ## Extra Credit
 
 ### 1. Merge zip code shapefile with population
+Use the zip code shapefile from the previous problem set and merge it with zip codelevel
+population data. (Go to Census Data Portal, select “ZIP Code Tabulation Area”,
+check “All 5-digit ZIP Code Tabulation Areas within United States”, and under “P1
+TOTAL POPULATION” select “2020: DEC Demographic and Housing Characteristics”.
+Download the csv.).
+
 ```{python}
 
 ```
 
 ### 2. Conduct spatial join
+Conduct a spatial join between zip code shapefile and the district shapefile, then aggregate
+to get population in each district.
 ```{python}
 
 ```
 
 ### 3. Map the action ratio in each district
+Map the ratio of enforcement actions in each US Attorney District. You can calculate the
+ratio by aggregating the number of enforcement actions since January 2021 per district,
+and dividing it with the population data.
 ```{python}
 
 ```
