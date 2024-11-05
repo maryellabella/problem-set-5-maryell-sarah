@@ -142,8 +142,6 @@ for link in enforcement_df['Link']:
             if agency_name:
                 agency_name = agency_name.strip()  
 
-    if not agency_name:
-        agency_name = None
     agency_names.append(agency_name)
 
 enforcement_df['Agency'] = agency_names
