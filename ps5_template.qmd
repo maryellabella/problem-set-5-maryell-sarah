@@ -210,7 +210,6 @@ actions since January 2023. How many enforcement actions do you get in your fina
 dataframe? What is the date and details of the earliest enforcement action it scraped?
 
 ```{python}
-
 def scrape_enforcement_actions(month, year):
     if year < 2013:
         print("Only enforcement actions from 2013 onwards are available. Please enter a year >= 2013.")
@@ -277,8 +276,6 @@ print("Total enforcement actions since January 2023:", total_actions)
 
 earliest_action = enforcement_df.sort_values(by='Date').iloc[0]
 print("Earliest enforcement action:\n", earliest_action)
-
-
 ```
 
 
@@ -289,7 +286,70 @@ enforcement action it scraped? Use the dataframe from this process for every que
 after this.
 
 ```{python}
+def scrape_enforcement_actions(month, year):
+    if year < 2013:
+        print("Only enforcement actions from 2013 onwards are available. Please enter a year >= 2013.")
+        return None
+    
+    """Initialize an empty list to store enforcement actions"""
+    enforcement_actions = []
+    base_url = "https://oig.hhs.gov/fraud/enforcement/?page="
+    page_num = 1  
+    start_date = datetime(year, month, 1)
 
+    while True:
+        page_url = base_url + str(page_num)
+        response = requests.get(page_url)
+        
+        soup = BeautifulSoup(response.text, 'html.parser')
+        
+        main_tag = soup.find('main')
+        li_with_div = main_tag.find_all(lambda t: t.name == 'li' and t.find('div'))
+        
+        for li in li_with_div:
+            li_soup = BeautifulSoup(''.join(str(item) for item in li.contents), 'html.parser')
+            
+            title_tag = li_soup.select_one('h2 a')
+            date_tag = li_soup.select_one('span')
+            category_tag = li_soup.select_one('ul li')
+            
+            title = title_tag.get_text(strip=True) if title_tag else None
+            link = title_tag['href'] if title_tag else None
+            date_str = date_tag.get_text(strip=True) if date_tag else None
+            category = category_tag.get_text(strip=True) if category_tag else None
+            
+            try:
+                date = datetime.strptime(date_str, "%B %d, %Y")
+            except ValueError:
+                continue 
+            
+            if date < start_date:
+                return pd.DataFrame(enforcement_actions)
+
+            enforcement_actions.append({
+                'Title': title,
+                'Link': f"https://oig.hhs.gov{link}",
+                'Date': date,
+                'Category': category
+            })
+        
+        page_num += 1
+        sleep(1)  
+
+    enforcement_df = pd.DataFrame(enforcement_actions)
+    return enforcement_df
+
+"""Run the function to collect data from January 2021 onward"""
+enforcement_df = scrape_enforcement_actions(1, 2021)
+```
+
+
+```{python}
+total_actions = len(enforcement_df)
+print("Total enforcement actions since January 2021:", total_actions)
+
+earliest_action = enforcement_df.sort_values(by='Date').iloc[0]
+print("Earliest enforcement action:\n", earliest_action)
 ```
 
 ## Step 3: Plot data based on scraped data
