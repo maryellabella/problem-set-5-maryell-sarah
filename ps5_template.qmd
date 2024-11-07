@@ -215,14 +215,20 @@ def scrape_enforcement_actions(month, year):
         print("Only enforcement actions from 2013 onwards are available. Please enter a year >= 2013.")
         return None
     
-    """Initialize an empty list to store enforcement actions"""
+    """Initialize list to store enforcement actions"""
     enforcement_actions = []
-    base_url = "https://oig.hhs.gov/fraud/enforcement/"
-    page_url = base_url
+    base_url = "https://oig.hhs.gov/fraud/enforcement/?page="
+    page_num = 1  # Start from the first page
     start_date = datetime(year, month, 1)
 
     while True:
+        page_url = base_url + str(page_num)
         response = requests.get(page_url)
+        
+        if response.status_code != 200:
+            print(f"Failed to retrieve data from page {page_num}")
+            break
+        
         soup = BeautifulSoup(response.text, 'html.parser')
         
         main_tag = soup.find('main')
@@ -243,11 +249,11 @@ def scrape_enforcement_actions(month, year):
             try:
                 date = datetime.strptime(date_str, "%B %d, %Y")
             except ValueError:
-                continue
+                continue  
             
             if date < start_date:
-                return pd.DataFrame(enforcement_actions)  
-
+                return pd.DataFrame(enforcement_actions)
+            
             enforcement_actions.append({
                 'Title': title,
                 'Link': f"https://oig.hhs.gov{link}",
@@ -255,13 +261,10 @@ def scrape_enforcement_actions(month, year):
                 'Category': category
             })
         
-        next_page = soup.select_one("a[rel='next']")
-        if next_page:
-            page_url = base_url + next_page['href']
-            sleep(1) 
-        else:
-            break
+        page_num += 1
+        sleep(1)  
 
+    """Final DataFrame after collecting all enforcement actions"""
     enforcement_df = pd.DataFrame(enforcement_actions)
     return enforcement_df
 
@@ -359,6 +362,24 @@ print("Earliest enforcement action:\n", earliest_action)
 time (aggregated to each month+year) overall since January 2021,
 
 ```{python}
+
+enforcement_df['Date'] = pd.to_datetime(enforcement_df['Date'])
+
+enforcement_df['YearMonth'] = enforcement_df['Date'].dt.to_period('M')
+enforcement_counts = enforcement_df.groupby('YearMonth').size().reset_index(name='Count')
+
+enforcement_counts['YearMonth'] = enforcement_counts['YearMonth'].dt.to_timestamp()
+
+"""Plotting with Altair"""
+chart = alt.Chart(enforcement_counts).mark_line().encode(
+    x=alt.X('YearMonth:T', title='Year and Month', axis=alt.Axis(format='%Y-%m')),  # Format to show year and month
+    y=alt.Y('Count:Q', title='Count of Enforcement Actions')
+).properties(
+    title='Number of Enforcement Actions Over Time'
+)
+
+chart.show()
+
 
 ```
 
