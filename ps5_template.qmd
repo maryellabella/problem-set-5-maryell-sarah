@@ -72,6 +72,7 @@ page and scrape and collect the following into a dataset:
 • Link associated with the enforcement action
 
 ```{python}
+
 url = "https://oig.hhs.gov/fraud/enforcement/"
 response = requests.get(url)
 soup = BeautifulSoup(response.text, 'lxml')
@@ -534,6 +535,10 @@ names you collected and plot a choropleth of the number of enforcement actions f
 state. Hint: look for “State of” in the agency info!
 ```{python}
 
+#path = r'/Users/maryell/Desktop/problem-set-5-maryell-sarah/'
+
+path = r'/Users/maryell/Desktop/problem-set-5-maryell-sarah/'
+
 ```
 
 
@@ -603,7 +608,6 @@ merged_gdf.plot(
     column='Count',
     ax=ax,
     legend=True,
-    cmap='OrRd',
     edgecolor='black',
     norm=norm,
     missing_kwds={'color': 'lightgrey', 'edgecolor': 'black', 'hatch': '///'},
@@ -634,17 +638,26 @@ Download the csv.).
 
 
 ```{python}
-
-zip_shapefile = gpd.read_file('/Users/sarahkim/Documents/Coding/gz_2010_us_860_00_500k/gz_2010_us_860_00_500k.shp')
-
-population_data = pd.read_csv('/Users/sarahkim/Documents/Coding/DECENNIALDHC2020.P1_2024-11-08T161631/DECENNIALDHC2020.P1-Data.csv')
+census_zip_folder = 'gz_2010_us_860_00_500k'
+census_zip_path = os.path.join(path, census_zip_folder, 'gz_2010_us_860_00_500k.shp')
+zip_shapefile = gpd.read_file(census_zip_path)
 
 ```
 
 ```{python}
+population_data_folder = 'DECENNIALDHC2020.P1_2024-11-08T190918'
+population_data_path = os.path.join(path, population_data_folder, 'DECENNIALDHC2020.P1-Data.csv')
+population_data = pd.read_csv(population_data_path)
+print("Columns in population data:", population_data.columns)
+print(population_data.head())
+
 """Format ZIP codes in population data and rename population column"""
-population_data['ZIP'] = population_data['ZIP'].str.replace('ZCTA5 ', '').str.zfill(5)
+population_data = population_data.drop(index=0)
+population_data['ZIP'] = population_data['NAME'].str.replace('ZCTA5 ', '').str.zfill(5)
+population_data = population_data[['ZIP', 'P1_001N']]
 population_data = population_data.rename(columns={'P1_001N': 'Population'})
+
+zip_shapefile = zip_shapefile.rename(columns={'ZCTA5': 'ZIP'})
 
 """Merge shapefile and population data"""
 merged_zip_data = zip_shapefile.merge(population_data[['ZIP', 'Population']], on='ZIP', how='left')
@@ -657,7 +670,6 @@ print("\nSample of merged_zip_data (first 5 rows):")
 print(merged_zip_data.head())
 print("\nSummary of 'Population' in merged data after handling missing values:")
 print(merged_zip_data['Population'].describe())
-
 ```
 
 
