@@ -218,7 +218,7 @@ dataframe? What is the date and details of the earliest enforcement action it sc
 ```{python}
 
 def scrape_enforcement_actions(month, year):
-    """Scrape enforcement actions and associated agency information."""
+    """Scrape enforcement actions and associated agency information, and save to a CSV file."""
 
     if year < 2013:
         print("Only enforcement actions from 2013 onwards are available. Please enter a year >= 2013.")
@@ -282,8 +282,8 @@ def scrape_enforcement_actions(month, year):
             print(f"Error scraping page {page_num}: {e}")
             return [], "CONTINUE"
 
-    """Function to scrape agency name from the enforcement action detail page"""
     def scrape_agency_name(link):
+        """Scrape agency name from the enforcement action detail page."""
         try:
             response = requests.get(link, timeout=10)
             response.raise_for_status()
@@ -323,24 +323,21 @@ def scrape_enforcement_actions(month, year):
     """Create a DataFrame from collected enforcement actions"""
     enforcement_df = pd.DataFrame(all_actions)
 
+    """Save DataFrame to CSV"""
+    current_date = datetime.now()
+    year_month = current_date.strftime("%Y_%m") 
+    filename = f"enforcement_actions_{year_month}.csv"
+    output_path = os.path.join('.', filename)  
+    enforcement_df.to_csv(output_path, index=False)
+
+    print(f"CSV file saved as: {output_path}")
     return enforcement_df
 
-
-"""Run the function to collect data from January 2023 onward"""
 enforcement_df = scrape_enforcement_actions(1, 2023)
 print("Number of enforcement actions collected:", len(enforcement_df))
 if not enforcement_df.empty:
     print("Earliest enforcement action:", enforcement_df.sort_values(by='Date').iloc[0])
 
-current_date = datetime.now()
-year_month = current_date.strftime("%Y_%m") 
-filename = f"enforcement_actions_{year_month}.csv"
-
-output_path = os.path.join('.', filename)  
-
-enforcement_df.to_csv(output_path, index=False)
-
-print(f"CSV file saved as: {output_path}")
 
 #used chatgpt to debug because it was taking ages to run the function
 #https://docs.python.org/3/library/concurrent.futures.html
@@ -537,7 +534,7 @@ state. Hint: look for “State of” in the agency info!
 
 #path = r'/Users/maryell/Desktop/problem-set-5-maryell-sarah/'
 
-path = r'/Users/maryell/Desktop/problem-set-5-maryell-sarah/'
+path = r'/Users/sarahkim/Documents/Coding/'
 
 ```
 
