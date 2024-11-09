@@ -614,11 +614,14 @@ state_name_to_abbr = {
 
 """Extract state abbreviation from a state name found in the agency information."""
 def extract_state_abbr(agency_name):
+    if 'district' in agency_name.lower():
+        return None  
+    
     for state_name in state_name_to_abbr:
         pattern = r'\b' + re.escape(state_name) + r'\b'
         match = re.search(pattern, agency_name, re.IGNORECASE)        
         if match:
-            return state_name_to_abbr[state_name]  
+            return state_name_to_abbr[state_name]
     return None
 
 enforcement_df['State_abbr'] = enforcement_df['Agency'].apply(extract_state_abbr)
@@ -777,6 +780,7 @@ print(merged_zip_data['Population'].describe())
 ### 2. Conduct spatial join
 Conduct a spatial join between zip code shapefile and the district shapefile, then aggregate
 to get population in each district.
+
 ```{python}
 merged_with_districts = gpd.sjoin(merged_zip_data, districts_gdf, how="left", predicate="intersects")
 
@@ -791,30 +795,42 @@ print("CRS of districts_gdf:", districts_gdf.crs)
 
 ```
 
-```{python}
 
-# If the CRS are different, convert one of the datasets to match the other's CRS
-# Convert zip_shapefile to the CRS of districts_gdf
+```{python}
 zip_shapefile = zip_shapefile.to_crs(districts_gdf.crs)
 
-# Step 2: Perform the spatial join
-# This joins the zip code polygons with the districts by spatial relationship (intersects)
-merged_with_districts = gpd.sjoin(zip_shapefile, districts_gdf, how="left", predicate="intersects")
+Columns in merged_zip_data before spatial join: Index(['GEO_ID', 'ZIP', 'NAME', 'LSAD', # Perform the spatial join between zip_shapefile and districts_gdf
+merged_with_districts = gpd.sjoin(merged_zip_data, districts_gdf, how="left", predicate="intersects")
 
-# Step 3: Check the columns of the merged data to make sure Population column is included
+# Check columns in merged_with_districts after the spatial join
 print("Columns in merged_with_districts after spatial join:", merged_with_districts.columns)
 
-# Step 4: Convert 'Population' to numeric and fill missing values (if any)
+# Check if 'Population' column exists after the join
+if 'Population' in merged_with_districts.columns:
+    print("Population column is present.")
+else:
+    print("Population column is missing.")
+
+```
+
+
+```{python}
+# Step 2: Perform the spatial join
+# This joins the zip code polygons with the districts by spatial relationship (intersects)
+zip_shapefile = zip_shapefile.to_crs(districts_gdf.crs)
+
+# Perform the spatial join between ZIP code shapefile and district shapefile
+merged_with_districts = gpd.sjoin(zip_shapefile, districts_gdf, how="left", predicate="intersects")
+
+# Ensure the 'Population' column is numeric and fill missing values with 0
 merged_with_districts['Population'] = pd.to_numeric(merged_with_districts['Population'], errors='coerce')
 merged_with_districts['Population'] = merged_with_districts['Population'].fillna(0)
 
-# Step 5: Aggregate population by district using the 'district_n' column
-# If 'district_n' column is not available, use the correct column that identifies districts
+# Aggregate population by district (group by 'district_n')
 population_by_district = merged_with_districts.groupby('district_n')['Population'].sum().reset_index()
 
-# Step 6: Display the results of population aggregation
-print("\nPopulation by district (first 5 rows):")
-print(population_by_district)
+# Display the result
+print(population_by_district.head())
 
 ```
 
